@@ -1,68 +1,89 @@
+pip install streamlit pandas
 import streamlit as st
-import datetime
 import pandas as pd
 
-# --- CONFIGURATION & CONSTANTS ---
-BASE_PRICE = 100.0  # Base price per kg
-OPTIMAL_TEMP = 20.0 # Celsius
-OPTIMAL_HUMIDITY = 60.0 # Percentage
-DECAY_SENSITIVITY = 0.05 # How fast price drops per degree/percent deviation
-
-# Hardcoded Auspicious/Festival Days for simulation
-# In a full system, you'd pull this from a Calendar API
-AUSPICIOUS_DAYS = {
-    datetime.date(2026, 5, 15): "Local Festival",
-    datetime.date(2026, 5, 25): "Muhurtham Date",
+# --- DATA FROM YOUR CHART ---
+FRUIT_DATA = {
+    "Apple": {"opt_temp": 1, "opt_humidity": 92, "ambient_life": 10},
+    "Mango": {"opt_temp": 12, "opt_humidity": 87, "ambient_life": 6},
+    "Banana": {"opt_temp": 14, "opt_humidity": 87, "ambient_life": 4},
+    "Guava": {"opt_temp": 9, "opt_humidity": 92, "ambient_life": 3},
+    "Orange": {"opt_temp": 6, "opt_humidity": 87, "ambient_life": 10},
+    "Sapota": {"opt_temp": 14, "opt_humidity": 87, "ambient_life": 3},
+    "Pineapple": {"opt_temp": 9, "opt_humidity": 87, "ambient_life": 6},
+    "Pomegranate": {"opt_temp": 6, "opt_humidity": 92, "ambient_life": 12},
 }
 
-def calculate_dynamic_price(base_price, days_passed, temp, humidity, next_event_date):
-    # 1. Calculate Shelf Life Penalty (Decay)
-    # Higher temp/humidity beyond optimal reduces value
-    temp_penalty = max(0, (temp - OPTIMAL_TEMP) * DECAY_SENSITIVITY)
-    humid_penalty = max(0, (humidity - OPTIMAL_HUMIDITY) * (DECAY_SENSITIVITY / 2))
-    total_decay = (days_passed * 2) + temp_penalty + humid_penalty
+def calculate_dynamic_price(wholesale, margin, fruit_name, days, temp, humidity):
+    data = FRUIT_DATA[fruit_name]
+    base_retail = wholesale * (1 + (margin / 100))
     
-    current_value = base_price - total_decay
+    # 1. PROFIT LOCK: Protect margin for the first 40% of ambient life
+    freshness_window = data["ambient_life"] * 0.4
     
-    # 2. Calculate Auspicious Premium (Demand)
-    premium = 0
-    if next_event_date:
-        days_until_event = (next_event_date - datetime.date.today()).days
-        if 0 <= days_until_event <= 3:
-            # 20% hike if the event is within 3 days
-            premium = base_price * 0.20
-            
-    final_price = max(current_value + premium, base_price * 0.3) # Floor price at 30%
-    return round(final_price, 2)
+    if days <= freshness_window:
+        return round(base_retail, 2), "PREMIUM QUALITY", (base_retail - wholesale)
+    
+    # 2. CALC PENALTIES (Only after Freshness Window)
+    # Humidity Buffer: High humidity slows down the heat damage
+    humid_buffer = 0.5 if humidity > 80 else 1.0
+    
+    # Tiny temp penalty (0.5% per degree above optimal)
+    temp_diff = max(0, temp - data["opt_temp"])
+    temp_penalty = (temp_diff * 0.005) * humid_buffer
+    
+    # Age penalty (15% max impact over total life)
+    age_penalty = (days / data["ambient_life"]) * 0.15
+    
+    final_price = base_retail * (1 - temp_penalty - age_penalty)
+    
+    # 3. FLOOR LOCK: Minimum 15% profit guaranteed
+    floor_price = wholesale * 1.15
+    
+    if final_price < floor_price:
+        return round(floor_price, 2), "MOVE TO PROCESSING", (floor_price - wholesale)
+    
+    return round(final_price, 2), "PROMOTIONAL PRICE", (final_price - wholesale)
 
-# --- STREAMLIT DASHBOARD UI ---
-st.title("🍎 Smart Retail Dynamic Pricing")
-st.subheader("Inventory & Environmental Monitoring")
+# --- STREAMLIT UI ---
+st.set_page_config(page_title="Fresgo Dynamic Pricing", layout="centered")
 
-# Sidebar - Inputs
-st.sidebar.header("Input Parameters")
-fruit_type = st.sidebar.selectbox("Select Fruit", ["Mango", "Banana", "Orange"])
-date_received = st.sidebar.date_input("Date Received", datetime.date.today() - datetime.timedelta(days=2))
-temp = st.sidebar.slider("Current Store Temp (°C)", 10, 45, 28)
-humidity = st.sidebar.slider("Current Humidity (%)", 30, 95, 75)
+st.title("🍓 Fresgo Smart Pricing Engine")
+st.markdown("---")
 
-# Logic Processing
-days_on_shelf = (datetime.date.today() - date_received).days
-next_event = min([d for d in AUSPICIOUS_DAYS.keys() if d >= datetime.date.today()], default=None)
+# Layout Columns
+col1, col2 = st.columns(2)
 
-current_price = calculate_dynamic_price(BASE_PRICE, days_on_shelf, temp, humidity, next_event)
+with col1:
+    st.header("Inventory Data")
+    fruit_choice = st.selectbox("Select Fruit", list(FRUIT_DATA.keys()))
+    wholesale_input = st.number_input("Wholesale Price (₹/kg)", min_value=10.0, value=80.0, step=1.0)
+    margin_input = st.number_input("Target Margin (%)", min_value=15.0, value=40.0, step=5.0)
+    days_input = st.slider("Days on Shelf", 0, 15, 1)
 
-# --- DISPLAY RESULTS ---
-col1, col2, col3 = st.columns(3)
-col1.metric("Current Price", f"₹{current_price}")
-col2.metric("Days on Shelf", f"{days_on_shelf} Days")
-col3.metric("Event Premium", "Active" if (next_event and (next_event - datetime.date.today()).days <= 3) else "None")
+with col2:
+    st.header("Store Environment")
+    temp_input = st.slider("Store Temp (°C)", 15, 45, 30)
+    humid_input = st.slider("Relative Humidity (%)", 30, 100, 75)
 
-if next_event:
-    st.info(f"Next High-Demand Event: **{AUSPICIOUS_DAYS[next_event]}** on {next_event}")
+# Calculation
+final_p, status, profit = calculate_dynamic_price(
+    wholesale_input, margin_input, fruit_choice, days_input, temp_input, humid_input
+)
 
-# Strategy Recommendation
-if current_price < (BASE_PRICE * 0.5):
-    st.warning("⚠️ CRITICAL: Low Shelf Life. Redirecting to Processing Unit for Marmalade/Juice.")
+# Output Display
+st.markdown("---")
+res1, res2, res3 = st.columns(3)
+
+res1.metric("Selling Price", f"₹{final_p}")
+res2.metric("Profit per Kg", f"₹{round(profit, 2)}")
+
+if status == "PREMIUM QUALITY":
+    res3.success(status)
+elif status == "PROMOTIONAL PRICE":
+    res3.warning(status)
 else:
-    st.success("✅ Quality high. Maintain premium shelf placement.")
+    res3.error(status)
+    st.error(f"⚠️ ALERT: Transfer {fruit_choice} to the Dark Store for Juices/Bakery immediately.")
+
+st.info(f"**Retail Logic:** For {fruit_choice}, your profit is locked for the first {int(FRUIT_DATA[fruit_choice]['ambient_life']*0.4)} days.")
