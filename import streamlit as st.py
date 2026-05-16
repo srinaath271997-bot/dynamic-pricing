@@ -6,16 +6,16 @@ import datetime
 
 # --- 1. BIOLOGICAL DATA & POS MAPPING ---
 FRUIT_SPECS = {
-    "Apple": {"life": 12, "opt_t": 1},
-    "Mango": {"life": 6, "opt_t": 12},
-    "Banana": {"life": 4, "opt_t": 14},
-    "Guava": {"life": 3, "opt_t": 9},
-    "Orange": {"life": 10, "opt_t": 6},
-    "Pomegranate": {"life": 12, "opt_t": 6},
-    "Grapes": {"life": 4, "opt_t": 1},
-    "Papaya": {"life": 4, "opt_t": 12},
-    "Sapota": {"life": 3, "opt_t": 14},
-    "Pineapple": {"life": 6, "opt_t": 9}
+    "Apple": {"life": 12, "opt_t": 1, "opt_h": 90},
+    "Mango": {"life": 6, "opt_t": 12, "opt_h": 85},
+    "Banana": {"life": 4, "opt_t": 14, "opt_h": 85},
+    "Guava": {"life": 3, "opt_t": 9, "opt_h": 90},
+    "Orange": {"life": 10, "opt_t": 6, "opt_h": 85},
+    "Pomegranate": {"life": 12, "opt_t": 6, "opt_h": 90},
+    "Grapes": {"life": 4, "opt_t": 1, "opt_h": 90},
+    "Papaya": {"life": 4, "opt_t": 12, "opt_h": 85},
+    "Sapota": {"life": 3, "opt_t": 14, "opt_h": 85},
+    "Pineapple": {"life": 6, "opt_t": 9, "opt_h": 85}
 }
 
 POS_MAPPING = {
@@ -26,7 +26,7 @@ POS_MAPPING = {
     'ELAKKI BANANA': 'Banana', 'POOVAN BANANA': 'Banana'
 }
 
-# --- 2. SECURE CLOUD DATABASE LOGIC ---
+# --- 2. SECURE CLOUD DATABASE LOGIC (Untouched) ---
 def get_gsh_client():
     creds_info = st.secrets["gcp_service_account"]
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
@@ -60,11 +60,12 @@ def save_to_google(df):
     except Exception as e:
         st.error(f"Cloud Save Error: {e}")
 
-# --- 3. HIGH-MARGIN PRICING ENGINE ---
-def get_price(cost, date_p, temp, fruit, margin):
+# --- 3. HIGH-MARGIN PRICING ENGINE (Updated with Humidity) ---
+def get_price(cost, date_p, temp, humidity, fruit, margin):
     if fruit not in FRUIT_SPECS:
         return round(cost * (1 + (margin/100)), 2), "UNKNOWN"
     
+    specs = FRUIT_SPECS[fruit]
     age = (datetime.date.today() - date_p).days
     
     # 15% Wastage Buffer ensures bad fruit doesn't kill profits
@@ -75,9 +76,15 @@ def get_price(cost, date_p, temp, fruit, margin):
     if age <= 2:
         return round(target_price, 2), "PREMIUM"
         
-    # Gradual Decay based on age
-    decay = max(0, (age - 2) * 0.02)
-    final_price = target_price * (1 - decay)
+    # Humidity Buffer Logic
+    h_buffer = 0.5 if humidity > specs.get('opt_h', 85) else 1.0
+    
+    # Gradual Decay based on age and heat
+    age_decay = max(0, (age - 2) * 0.02)
+    temp_decay = max(0, (temp - specs['opt_t']) * 0.005 * h_buffer)
+    total_decay = age_decay + temp_decay
+    
+    final_price = target_price * (1 - total_decay)
     
     # Absolute Floor: Never sell below 25% profit over base cost
     floor = cost * 1.25 
@@ -91,9 +98,9 @@ st.title("🚀 Fresgo: Complete Cloud Retail OS")
 if 'inventory' not in st.session_state:
     st.session_state.inventory = load_from_google()
 
-tab_inv, tab_price, tab_analytics = st.tabs(["📦 Inventory & Sales", "🏷️ Smart Pricing", "📊 Profit Monitor"])
+tab_inv, tab_price, tab_analytics = st.tabs(["📦 Inventory & Sales", "🏷️ Smart Pricing", "📈 Store Insights"])
 
-# --- TAB 1: UPLOADS & DEDUCTIONS ---
+# --- TAB 1: UPLOADS & DEDUCTIONS (Untouched) ---
 with tab_inv:
     col1, col2 = st.columns(2)
     
@@ -111,7 +118,6 @@ with tab_inv:
         st.subheader("2. Outward (Daily Sales)")
         up_sales = st.file_uploader("Upload IWSR.CSV", type="csv")
         if up_sales:
-            # Skips your 5 lines of POS metadata
             df_sales = pd.read_csv(up_sales, skiprows=5) 
             if 'ITEM NAME' in df_sales.columns and 'QTY' in df_sales.columns:
                 df_sales['ITEM NAME'] = df_sales['ITEM NAME'].str.strip()
@@ -125,7 +131,6 @@ with tab_inv:
                 if st.button("Deduct Sales & Update Cloud"):
                     inv = st.session_state.inventory.copy()
                     
-                    # FIFO Logic: Deduct from oldest stock first
                     for fruit, sold_qty in daily_totals.items():
                         fruit_idx = inv[inv['Fruit'] == fruit].sort_values('Date Procured').index
                         for idx in fruit_idx:
@@ -136,7 +141,6 @@ with tab_inv:
                             inv.at[idx, 'Qty (kg)'] -= deduct
                             sold_qty -= deduct
                     
-                    # Clean up empty stock
                     inv = inv[inv['Qty (kg)'] > 0].reset_index(drop=True)
                     st.session_state.inventory = inv
                     save_to_google(inv)
@@ -144,32 +148,77 @@ with tab_inv:
             else:
                 st.error("Could not find ITEM NAME or QTY in the file. Check formatting.")
 
-# --- TAB 2: LIVE PRICING ENGINE ---
+# --- TAB 2: LIVE PRICING ENGINE (Updated with Individual Margins & Humidity) ---
 with tab_price:
     st.header("Today's Shelf Prices")
     c1, c2 = st.columns(2)
     store_temp = c1.slider("Store Temp (°C)", 15, 45, 30)
-    target_m = c2.number_input("Target Margin %", value=60)
+    store_humid = c2.slider("Store Humidity (%)", 30, 100, 70)
     
     if not st.session_state.inventory.empty:
         inv_display = st.session_state.inventory.copy()
+        
+        # Isolate fruits currently in stock to generate sliders
+        active_fruits = inv_display['Fruit'].unique()
+        
+        st.write("---")
+        st.subheader("Target Margins by Fruit (%)")
+        st.caption("Adjust margins individually. The engine automatically prevents prices from dropping below a 25% profit floor.")
+        
+        # Create a dynamic row of inputs based on what's in stock
+        margin_cols = st.columns(min(len(active_fruits), 5))
+        individual_margins = {}
+        
+        for i, fruit_name in enumerate(active_fruits):
+            col = margin_cols[i % 5]
+            # Default to 60% for each
+            individual_margins[fruit_name] = col.number_input(fruit_name, value=60, step=5, key=f"m_{fruit_name}")
+            
+        st.write("---")
+        
         prices = []
         statuses = []
         
         for _, row in inv_display.iterrows():
-            p, s = get_price(row['Wholesale Price'], row['Date Procured'], store_temp, row['Fruit'], target_m)
+            f_margin = individual_margins.get(row['Fruit'], 60)
+            p, s = get_price(row['Wholesale Price'], row['Date Procured'], store_temp, store_humid, row['Fruit'], f_margin)
             prices.append(p)
             statuses.append(s)
         
         inv_display['Selling Price (₹)'] = prices
         inv_display['Status'] = statuses
-        st.table(inv_display)
+        st.table(inv_display[['Fruit', 'Qty (kg)', 'Wholesale Price', 'Date Procured', 'Selling Price (₹)', 'Status']])
     else:
-        st.info("Inventory is empty. Upload procurement data.")
+        st.info("Inventory is empty. Upload procurement data to set margins.")
 
-# --- TAB 3: BUSINESS TACTICS ---
+# --- TAB 3: ACTIONABLE INSIGHTS (New Feature) ---
 with tab_analytics:
-    st.header("Margin & Strategy Monitor")
-    st.info("Your pricing engine automatically inflates your wholesale cost by **15%** behind the scenes. This ensures that even if you lose 1.5kg out of every 10kg to spoilage, your target margin remains intact on the sold goods.")
-    st.write("### Competitor Shield")
-    st.write("If nearby markets drop their prices, rely on the **Absolute Floor** logic built into Tab 2. Even on your oldest fruit, the system will mathematically prevent you from pricing below a 25% profit margin.")
+    st.header("Store Action Dashboard")
+    if not st.session_state.inventory.empty:
+        inv_data = st.session_state.inventory.copy()
+        
+        # Capital Calculator
+        total_capital = (inv_data['Qty (kg)'] * inv_data['Wholesale Price']).sum()
+        st.metric("Total Wholesale Capital on Floor", f"₹{total_capital:,.2f}")
+        st.caption("This is the raw cost of the fruit currently sitting in the shop.")
+        
+        st.write("---")
+        st.subheader("🚨 Urgent Clearance & Juice Bar Transfers")
+        
+        alerts = []
+        for _, row in inv_data.iterrows():
+            age = (datetime.date.today() - row['Date Procured']).days
+            f_life = FRUIT_SPECS.get(row['Fruit'], {}).get('life', 7)
+            
+            # If the fruit has used up 70% of its ambient life, it triggers an alert
+            if age >= (f_life * 0.70):
+                alerts.append(row)
+                
+        if alerts:
+            st.error("The following batches are nearing the end of their shelf life. Apply bulk bundle tactics or move them for processing.")
+            alert_df = pd.DataFrame(alerts)
+            st.table(alert_df[['Fruit', 'Qty (kg)', 'Date Procured']])
+        else:
+            st.success("All stock is fresh! No urgent transfers required today.")
+    else:
+        st.info("Upload inventory to view insights.")
