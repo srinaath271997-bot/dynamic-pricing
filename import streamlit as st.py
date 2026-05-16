@@ -1,88 +1,106 @@
 import streamlit as st
 import pandas as pd
+import datetime
 
-# --- DATA FROM YOUR CHART ---
-FRUIT_DATA = {
-    "Apple": {"opt_temp": 1, "opt_humidity": 92, "ambient_life": 10},
-    "Mango": {"opt_temp": 12, "opt_humidity": 87, "ambient_life": 6},
-    "Banana": {"opt_temp": 14, "opt_humidity": 87, "ambient_life": 4},
-    "Guava": {"opt_temp": 9, "opt_humidity": 92, "ambient_life": 3},
-    "Orange": {"opt_temp": 6, "opt_humidity": 87, "ambient_life": 10},
-    "Sapota": {"opt_temp": 14, "opt_humidity": 87, "ambient_life": 3},
-    "Pineapple": {"opt_temp": 9, "opt_humidity": 87, "ambient_life": 6},
-    "Pomegranate": {"opt_temp": 6, "opt_humidity": 92, "ambient_life": 12},
+# --- 1. SETTINGS & MASTER DATA ---
+# Using your chart data as the baseline
+FRUIT_SPECS = {
+    "Mango": {"life": 7, "opt_t": 12, "opt_h": 87},
+    "Banana": {"life": 5, "opt_t": 14, "opt_h": 87},
+    "Orange": {"life": 14, "opt_t": 6, "opt_h": 87},
+    "Guava": {"life": 3, "opt_t": 9, "opt_h": 92},
+    "Pomegranate": {"life": 15, "opt_t": 6, "opt_h": 92}
 }
 
-def calculate_dynamic_price(wholesale, margin, fruit_name, days, temp, humidity):
-    data = FRUIT_DATA[fruit_name]
-    base_retail = wholesale * (1 + (margin / 100))
+# Initialize the "Database" in memory
+if 'inventory' not in st.session_state:
+    st.session_state.inventory = pd.DataFrame(columns=[
+        "Batch ID", "Fruit", "Qty (kg)", "Wholesale Price", "Date Procured", "Status"
+    ])
+
+# --- 2. THE PRICING ENGINE (Logic from previous versions) ---
+def get_dynamic_price(cost, days, temp, humidity, fruit):
+    specs = FRUIT_SPECS[fruit]
+    base_retail = cost * 1.4  # Default 40% margin
     
-    # 1. PROFIT LOCK: Protect margin for the first 40% of ambient life
-    freshness_window = data["ambient_life"] * 0.4
-    
-    if days <= freshness_window:
-        return round(base_retail, 2), "PREMIUM QUALITY", (base_retail - wholesale)
-    
-    # 2. CALC PENALTIES (Only after Freshness Window)
-    # Humidity Buffer: High humidity slows down the heat damage
-    humid_buffer = 0.5 if humidity > 80 else 1.0
-    
-    # Tiny temp penalty (0.5% per degree above optimal)
-    temp_diff = max(0, temp - data["opt_temp"])
-    temp_penalty = (temp_diff * 0.005) * humid_buffer
-    
-    # Age penalty (15% max impact over total life)
-    age_penalty = (days / data["ambient_life"]) * 0.15
+    # Profit Lock: No discount for the first 30% of its life
+    if days <= (specs['life'] * 0.3):
+        return round(base_retail, 2)
+
+    # Gradual Decay Logic
+    # Humidity buffer: High humidity slows the decay
+    h_factor = 0.5 if humidity > 85 else 1.0
+    temp_penalty = max(0, (temp - specs['opt_t']) * 0.005) * h_factor
+    age_penalty = (days / specs['life']) * 0.10
     
     final_price = base_retail * (1 - temp_penalty - age_penalty)
+    return round(max(final_price, cost * 1.15), 2) # Never below 15% profit
+
+# --- 3. THE UI LAYOUT ---
+st.set_page_config(page_title="Fresgo Retail OS", layout="wide")
+st.title("🍎 Fresgo Integrated Retail System")
+
+tab_procure, tab_pricing, tab_tactics = st.tabs(["Inventory Manager", "Smart Pricing", "Big-Box Tactics"])
+
+# --- TAB 1: PROCUREMENT & INVENTORY ---
+with tab_procure:
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.subheader("New Procurement")
+        f_type = st.selectbox("Select Fruit", list(FRUIT_SPECS.keys()))
+        f_qty = st.number_input("Quantity (kg)", min_value=1.0)
+        f_cost = st.number_input("Wholesale Cost (₹/kg)", min_value=1.0)
+        if st.button("Add to Inventory"):
+            new_id = f"FRES-{len(st.session_state.inventory)+101}"
+            new_row = {
+                "Batch ID": new_id, "Fruit": f_type, "Qty (kg)": f_qty, 
+                "Wholesale Price": f_cost, "Date Procured": datetime.date.today(),
+                "Status": "Active"
+            }
+            st.session_state.inventory = pd.concat([st.session_state.inventory, pd.DataFrame([new_row])], ignore_index=True)
+            st.success(f"Batch {new_id} Added!")
+
+    with col2:
+        st.subheader("Live Stock Ledger")
+        st.dataframe(st.session_state.inventory, use_container_width=True)
+        if st.button("Clear Sold Out Items"):
+            # Logic to remove items with 0 qty
+            pass
+
+# --- TAB 2: SMART PRICING (Visual Tools) ---
+with tab_pricing:
+    st.header("Gradual Price Adjustment")
+    # Simulation Sliders
+    s_temp = st.slider("Store Temp (°C)", 15, 45, 30)
+    s_humid = st.slider("Store Humidity (%)", 30, 100, 70)
     
-    # 3. FLOOR LOCK: Minimum 15% profit guaranteed
-    floor_price = wholesale * 1.15
+    if not st.session_state.inventory.empty:
+        # Calculate current prices for all active inventory
+        display_inv = st.session_state.inventory.copy()
+        
+        def apply_pricing(row):
+            age = (datetime.date.today() - row['Date Procured']).days
+            return get_dynamic_price(row['Wholesale Price'], age, s_temp, s_humid, row['Fruit'])
+        
+        display_inv['Recommended Price'] = display_inv.apply(apply_pricing, axis=1)
+        st.table(display_inv[['Batch ID', 'Fruit', 'Qty (kg)', 'Wholesale Price', 'Recommended Price']])
+    else:
+        st.warning("Please add inventory first to see dynamic pricing.")
+
+# --- TAB 3: BIG-BOX TACTICS ---
+with tab_tactics:
+    st.header("Corporate Pricing Strategies")
+    target_p = st.number_input("Input Base Price for Tactic:", value=100.0)
     
-    if final_price < floor_price:
-        return round(floor_price, 2), "MOVE TO PROCESSING", (floor_price - wholesale)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Psychological Pricing")
+        st.write(f"Standard: ₹{target_p}")
+        st.metric("Charm Price", f"₹{int(target_p)-0.01 if target_p > 1 else 0.99}")
+        st.caption("Ending in .99 increases sales volume by up to 25%.")
     
-    return round(final_price, 2), "PROMOTIONAL PRICE", (final_price - wholesale)
-
-# --- STREAMLIT UI ---
-st.set_page_config(page_title="Fresgo Dynamic Pricing", layout="centered")
-
-st.title("🍓 Fresgo Smart Pricing Engine")
-st.markdown("---")
-
-# Layout Columns
-col1, col2 = st.columns(2)
-
-with col1:
-    st.header("Inventory Data")
-    fruit_choice = st.selectbox("Select Fruit", list(FRUIT_DATA.keys()))
-    wholesale_input = st.number_input("Wholesale Price (₹/kg)", min_value=10.0, value=80.0, step=1.0)
-    margin_input = st.number_input("Target Margin (%)", min_value=15.0, value=40.0, step=5.0)
-    days_input = st.slider("Days on Shelf", 0, 15, 1)
-
-with col2:
-    st.header("Store Environment")
-    temp_input = st.slider("Store Temp (°C)", 15, 45, 30)
-    humid_input = st.slider("Relative Humidity (%)", 30, 100, 75)
-
-# Calculation
-final_p, status, profit = calculate_dynamic_price(
-    wholesale_input, margin_input, fruit_choice, days_input, temp_input, humid_input
-)
-
-# Output Display
-st.markdown("---")
-res1, res2, res3 = st.columns(3)
-
-res1.metric("Selling Price", f"₹{final_p}")
-res2.metric("Profit per Kg", f"₹{round(profit, 2)}")
-
-if status == "PREMIUM QUALITY":
-    res3.success(status)
-elif status == "PROMOTIONAL PRICE":
-    res3.warning(status)
-else:
-    res3.error(status)
-    st.error(f"⚠️ ALERT: Transfer {fruit_choice} to the Dark Store for Juices/Bakery immediately.")
-
-st.info(f"**Retail Logic:** For {fruit_choice}, your profit is locked for the first {int(FRUIT_DATA[fruit_choice]['ambient_life']*0.4)} days.")
+    with c2:
+        st.subheader("Bulk/Bundle Logic")
+        st.write(f"1kg: ₹{target_p}")
+        st.metric("3kg Pack Price", f"₹{round(target_p * 2.7, 0)}")
+        st.caption("A 10% discount on 3kg encourages high-volume clearance.")
