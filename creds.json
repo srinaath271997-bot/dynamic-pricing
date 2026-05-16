@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "fresgo",
+  "private_key_id": "e00778cb67c685cbd8324c9d7194a18d744fbceb",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1rm00FjTSeHTb\nCbvxKidzQwQ4wYGhjtExqN2Yw48dbojTqIgXZXRCrY/KTrThYHIjXhFHWwF2KeZz\ngUFsOp8HglQDr+jThhkl101EHPHTBy1tj8art4bXAQI5UfyG2TibrfRMlKWF4oJs\nBZH5iLFuAN4xbZ7vV4imp2ZIehEfSl/iVTMhJfws5KMn0LnTai8tEWUigYx5tvgf\nnSTyy07ABMh540LaRaqYTUa8jpNhd2x5EaIY5cdxLznRT7XJQoykuw8Qp2YQX8V8\n16rBSX8d6FA/hxDkTVWaTegieeb9m2kG66KHWFPMpuBJZqy4QXyv9oQ3l0DYL+FO\ndzzer8ntAgMBAAECggEADg/cmvH3D61MGiIEPnPNTuIKgxwTHP6RWX8g+7BzNMt3\n4q4CLpFnMLv/S6DQ5jrRSsR+oN+92rf+gsUn26kj4vBm8UwdwLV539Bsxg9ZdkRx\ncy/0KBlR4fVNh0M9wPAyLfaGWKEOuLCh+Jtrw30dgo6lo/zAlvTW+lMtmwF7rsix\nBXeFLmuKe1Z4hpGK5M9W2pk/GGmHYUV0o8hxRSIg78eqw/Cx5apsdlsQ0GW97HFx\n8NdRpQ3RBmPVOn36ThK+inCcNjv9yveAcasYHR17a+69F+Gf2RsViRjS0QOfYPhc\n+oa8Acv1AMHNPg4M/WVae2UAGQr2tLU7qaQSmMA1LwKBgQDZVJMZroos88yhd8k0\ngJMXKfCiEpJa/fGbuypRm43+8Y1Y8jTG6jhrAonEBbZSmdlJzjGbKiS1w2gzAn3H\ntu3/Vfl0a33VMVFGVPAdHqmrw5ktMzywDch5srLHOc1gWQuJYu/rM0ZpAXXajClf\nAwAzZXKA0yLHv5lmfTJ3R39mUwKBgQDWAgjsjymUYhoByVxpBLQi5CkhQM55o0u8\nrHZn90EK+PSeqXJie8gzjzoG0Q9mCouRqGoO8DHJK7pg2h1QgdzPdlDTQMvLaqMH\ndkElNLmWd5kL2hBNkp4PjL68/XHWOfx1YqQz221zjUBqTerCsi8zGQhQ6M4ELYKN\nJM6QNEGGvwKBgQDKKY0ob57jD+qDLO1CZHPvMTlBWitAb0bniWRlQ2EEDWhhm/SS\nMGBI0rSaXoHqNmjU6fRlFP/PALWV9bRRKg4b3brNnAwSW+zxkqNFQzerqqh7TlUe\no8OfySXagx9Th6FerGTnEexmU1Bw+r6lPiJarPylb0HEM6ublcxy/lQ5NwKBgCCj\nYM8LKnE54POCzTgrAnoLyAYNRzAf6m4U8135xI6y10PXXd2NOUQ7xMLDYZDTbOPD\nBqHOmhkvNRaOTUg49f8h8UO2rx4P3ltF+rt85gz/onS/Rhs+kCKY+YIDOThN0aXp\nbFeIUJH96eQMjBAzcqVdXPpR9xGGC1IRWft+LLwrAoGBAMkvjwVyV8CoCiCdXfh8\n53ofjn2OcaiJZ5eSwij0+trQnUNpPHdM/a0fpk2FgJRuY4r19tfLpbfLOTwObMGu\n2iVEz7O7KPx+Eet8V2TXUysSnXG4Ttd3ffQZlYcpWzg6pcBLeQ0kggp1Sdca7wfH\nXYhh8Wgfy/Gq4X7xGQNXg8iq\n-----END PRIVATE KEY-----\n",
+  "client_email": "fresgo-enterprises@fresgo.iam.gserviceaccount.com",
+  "client_id": "115106378892185646268",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/fresgo-enterprises%40fresgo.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
