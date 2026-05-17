@@ -9,33 +9,23 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # --- AI SETUP & DEBUGGING ---
+# --- CLEAN SLATE AI CONFIG ---
 if "gemini_api_key" in st.secrets:
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
+        # We use 'gemini-1.5-flash' as it is the most stable for retail automation
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Try the most common model names in order of stability
-        available_models = ["models/gemini-1.5-flash", "gemini-1.5-flash", "models/gemini-pro"]
-        
-        success = False
-        for m_name in available_models:
-            try:
-                model = genai.GenerativeModel(m_name)
-                # Test call to verify it actually exists
-                model.generate_content("test") 
-                st.sidebar.success(f"✅ AI Active ({m_name})")
-                success = True
-                break
-            except:
-                continue
-        
-        if not success:
-            st.sidebar.error("❌ Models found but not responding.")
-            model = None
-            
+        # This small 'ping' test confirms if the key is actually ALIVE
+        test_response = model.generate_content("ping")
+        st.sidebar.success("✅ Fresgo AI is Online")
     except Exception as e:
-        st.sidebar.error(f"AI Setup Error: {e}")
+        # This will print the EXACT error from Google (e.g., 'API_KEY_INVALID' or 'QUOTA_EXCEEDED')
+        st.sidebar.error(f"AI offline: {e}")
         model = None
-
+else:
+    st.sidebar.warning("⚠️ Enter gemini_api_key in Secrets")
+    model = None
 # Biological Data & Mapping
 FRUIT_SPECS = {
     "Apple": {"life": 12, "opt_t": 1, "opt_h": 90},
