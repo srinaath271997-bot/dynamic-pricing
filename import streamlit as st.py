@@ -17,7 +17,7 @@ if "gemini_api_key" in st.secrets:
         
         # Configure the AI
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
         
         # Visual confirmation in the sidebar
         st.sidebar.success("✅ AI Co-Pilot Active")
