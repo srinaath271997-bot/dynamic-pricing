@@ -9,11 +9,17 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # Configure AI Agent
-try:
-    genai.configure(api_key=st.secrets["gemini_api_key"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.sidebar.warning("AI Key not found. AI features disabled.")
+# Updated AI Setup with Debugging
+if "gemini_api_key" in st.secrets:
+    try:
+        genai.configure(api_key=st.secrets["gemini_api_key"])
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        st.sidebar.success("✅ AI Co-Pilot Active")
+    except Exception as e:
+        st.sidebar.error(f"AI Setup Error: {e}")
+        model = None
+else:
+    st.sidebar.warning("⚠️ 'gemini_api_key' not found in Secrets.")
     model = None
 
 # Biological Data & Mapping
