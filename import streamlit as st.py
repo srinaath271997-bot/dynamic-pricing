@@ -9,27 +9,33 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # --- AI SETUP & DEBUGGING ---
-# --- VERSION-SPECIFIC AI SETUP ---
+# --- AUTO-DISCOVERY AI SETUP ---
 if "gemini_api_key" in st.secrets:
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
         
-        # In v1beta, 'gemini-1.5-flash' often needs the '-latest' suffix
-        # or just the base name depending on the backend update.
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # This part asks Google: "What models can I actually use?"
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
         
-        # Verification ping
-        response = model.generate_content("ping")
-        st.sidebar.success("✅ Fresgo AI is Online")
-    except Exception as e:
-        # Fallback to the standard name if 'latest' isn't recognized
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content("ping")
-            st.sidebar.success("✅ Fresgo AI is Online")
-        except Exception as second_error:
-            st.sidebar.error(f"AI Setup Error: {second_error}")
+        # We look for the best Flash or Pro model available to you
+        target_model = None
+        for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']:
+            if preferred in available_models:
+                target_model = preferred
+                break
+        
+        if target_model:
+            model = genai.GenerativeModel(target_model)
+            # Quick test to confirm it's actually responding
+            model.generate_content("test")
+            st.sidebar.success(f"✅ AI Online: {target_model}")
+        else:
+            st.sidebar.error("❌ No compatible models found in your account.")
             model = None
+            
+    except Exception as e:
+        st.sidebar.error(f"Discovery Error: {e}")
+        model = None
 else:
     st.sidebar.warning("⚠️ Enter gemini_api_key in Secrets")
     model = None
