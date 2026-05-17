@@ -9,20 +9,27 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # --- AI SETUP & DEBUGGING ---
-# --- CLEAN SLATE AI CONFIG ---
+# --- VERSION-SPECIFIC AI SETUP ---
 if "gemini_api_key" in st.secrets:
     try:
         genai.configure(api_key=st.secrets["gemini_api_key"])
-        # We use 'gemini-1.5-flash' as it is the most stable for retail automation
-        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # This small 'ping' test confirms if the key is actually ALIVE
-        test_response = model.generate_content("ping")
+        # In v1beta, 'gemini-1.5-flash' often needs the '-latest' suffix
+        # or just the base name depending on the backend update.
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        # Verification ping
+        response = model.generate_content("ping")
         st.sidebar.success("✅ Fresgo AI is Online")
     except Exception as e:
-        # This will print the EXACT error from Google (e.g., 'API_KEY_INVALID' or 'QUOTA_EXCEEDED')
-        st.sidebar.error(f"AI offline: {e}")
-        model = None
+        # Fallback to the standard name if 'latest' isn't recognized
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content("ping")
+            st.sidebar.success("✅ Fresgo AI is Online")
+        except Exception as second_error:
+            st.sidebar.error(f"AI Setup Error: {second_error}")
+            model = None
 else:
     st.sidebar.warning("⚠️ Enter gemini_api_key in Secrets")
     model = None
