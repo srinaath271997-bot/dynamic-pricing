@@ -9,36 +9,35 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # --- AI SETUP & DEBUGGING ---
-# --- AUTO-DISCOVERY AI SETUP ---
+import requests
+import json
+
+# --- DIRECT-HIT AI SETUP ---
 if "gemini_api_key" in st.secrets:
+    api_key = st.secrets["gemini_api_key"]
+    
+    # We will test the connection with a direct HTTP call first
+    test_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    payload = {"contents": [{"parts": [{"text": "Is the AI online?"}]}]}
+    headers = {'Content-Type': 'application/json'}
+
     try:
-        genai.configure(api_key=st.secrets["gemini_api_key"])
+        response = requests.post(test_url, json=payload, headers=headers)
         
-        # This part asks Google: "What models can I actually use?"
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # We look for the best Flash or Pro model available to you
-        target_model = None
-        for preferred in ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-pro']:
-            if preferred in available_models:
-                target_model = preferred
-                break
-        
-        if target_model:
-            model = genai.GenerativeModel(target_model)
-            # Quick test to confirm it's actually responding
-            model.generate_content("test")
-            st.sidebar.success(f"✅ AI Online: {target_model}")
+        if response.status_code == 200:
+            # If direct hit works, initialize the library
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            st.sidebar.success("✅ Fresgo AI is officially ONLINE")
         else:
-            st.sidebar.error("❌ No compatible models found in your account.")
+            # This will show us the EXACT reason (e.g. PERMISSION_DENIED or API_KEY_INVALID)
+            st.sidebar.error(f"Google Server Error: {response.status_code}")
+            st.sidebar.write(response.json())
             model = None
             
     except Exception as e:
-        st.sidebar.error(f"Discovery Error: {e}")
+        st.sidebar.error(f"Connection Failed: {e}")
         model = None
-else:
-    st.sidebar.warning("⚠️ Enter gemini_api_key in Secrets")
-    model = None
 # Biological Data & Mapping
 FRUIT_SPECS = {
     "Apple": {"life": 12, "opt_t": 1, "opt_h": 90},
