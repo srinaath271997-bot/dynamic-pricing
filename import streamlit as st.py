@@ -9,26 +9,32 @@ import google.generativeai as genai
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
 # --- AI SETUP & DEBUGGING ---
-# This looks into your secrets and checks if the key exists
 if "gemini_api_key" in st.secrets:
     try:
-        # Get the key from secrets
-        api_key = st.secrets["gemini_api_key"]
+        genai.configure(api_key=st.secrets["gemini_api_key"])
         
-        # Configure the AI
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('models/gemini-1.5-flash')
+        # Try the most common model names in order of stability
+        available_models = ["models/gemini-1.5-flash", "gemini-1.5-flash", "models/gemini-pro"]
         
-        # Visual confirmation in the sidebar
-        st.sidebar.success("✅ AI Co-Pilot Active")
+        success = False
+        for m_name in available_models:
+            try:
+                model = genai.GenerativeModel(m_name)
+                # Test call to verify it actually exists
+                model.generate_content("test") 
+                st.sidebar.success(f"✅ AI Active ({m_name})")
+                success = True
+                break
+            except:
+                continue
+        
+        if not success:
+            st.sidebar.error("❌ Models found but not responding.")
+            model = None
+            
     except Exception as e:
-        st.sidebar.error(f"❌ AI Setup Error: {e}")
+        st.sidebar.error(f"AI Setup Error: {e}")
         model = None
-else:
-    # This will trigger if the name in Secrets doesn't match the code
-    st.sidebar.warning("⚠️ Secret 'gemini_api_key' not found.")
-    st.sidebar.info("Check if your Secret name is exactly: gemini_api_key")
-    model = None
 
 # Biological Data & Mapping
 FRUIT_SPECS = {
