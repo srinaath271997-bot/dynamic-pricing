@@ -8,18 +8,26 @@ import google.generativeai as genai
 # --- 1. SETUP & CONFIG ---
 st.set_page_config(page_title="Fresgo OS", layout="wide")
 
-# Configure AI Agent
-# Updated AI Setup with Debugging
+# --- AI SETUP & DEBUGGING ---
+# This looks into your secrets and checks if the key exists
 if "gemini_api_key" in st.secrets:
     try:
-        genai.configure(api_key=st.secrets["gemini_api_key"])
+        # Get the key from secrets
+        api_key = st.secrets["gemini_api_key"]
+        
+        # Configure the AI
+        genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        # Visual confirmation in the sidebar
         st.sidebar.success("✅ AI Co-Pilot Active")
     except Exception as e:
-        st.sidebar.error(f"AI Setup Error: {e}")
+        st.sidebar.error(f"❌ AI Setup Error: {e}")
         model = None
 else:
-    st.sidebar.warning("⚠️ 'gemini_api_key' not found in Secrets.")
+    # This will trigger if the name in Secrets doesn't match the code
+    st.sidebar.warning("⚠️ Secret 'gemini_api_key' not found.")
+    st.sidebar.info("Check if your Secret name is exactly: gemini_api_key")
     model = None
 
 # Biological Data & Mapping
